@@ -1,18 +1,23 @@
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, StreamType } = require('@discordjs/voice');
+const {
+  createAudioPlayer,
+  createAudioResource,
+  joinVoiceChannel,
+  StreamType,
+} = require('@discordjs/voice');
 const googleTTS = require('google-tts-api');
 const https = require('https');
 const { Readable } = require('stream');
 
 async function speak(text, voiceChannel, lang = 'en') {
   try {
-    // Google TTS থেকে MP3 URL তৈরি
+    console.log(`🔊 Speaking in ${voiceChannel.name}: "${text}" [${lang}]`);
+
     const url = googleTTS.getAudioUrl(text, {
       lang,
       slow: false,
       host: 'https://translate.google.com',
     });
 
-    // MP3 স্ট্রিম ডাউনলোড
     const stream = await downloadStream(url);
 
     const resource = createAudioResource(stream, {
@@ -26,23 +31,25 @@ async function speak(text, voiceChannel, lang = 'en') {
       channelId: voiceChannel.id,
       guildId: voiceChannel.guild.id,
       adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+      selfDeaf: false,
     });
 
     connection.subscribe(player);
 
-    player.on('error', (err) => {
-      console.error('TTS Playback Error:', err);
+    player.on('error', error => {
+      console.error('🔴 Player Error:', error);
     });
 
     player.on('idle', () => {
+      console.log('⏹️ Playback done.');
       connection.destroy();
     });
+
   } catch (error) {
     console.error('TTS Error:', error);
   }
 }
 
-// Helper function: download mp3 from URL and return a stream
 function downloadStream(url) {
   return new Promise((resolve, reject) => {
     https.get(url, (res) => {
