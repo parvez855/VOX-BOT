@@ -1,117 +1,68 @@
-const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, generateDependencyReport } = require('@discordjs/voice');
+// events/voiceUpdate.js
+const { joinVoiceChannel, getVoiceConnection, entersState, VoiceConnectionStatus } = require('@discordjs/voice');
 const User = require('../models/User');
-const googleTTS = require('google-tts-api');
-const { getAudioUrl } = require('../speak'); // If you have a speak helper, else use google-tts-api directly
-
-console.log(generateDependencyReport()); // ডিপেন্ডেন্সি রিপোর্ট দেখাও (ডিবাগের জন্য)
-
-const activePlayers = new Map(); // গিল্ড অনুযায়ী এক্টিভ প্লেয়ার ট্র্যাক করার জন্য
+const speak = require('../speak');
 
 module.exports = async (oldState, newState) => {
-  // বট নিজে কোনো ভিসিতে গেলে বাদ দিবে
+  // বট নিজেই হলে কিছু না করো
   if ((oldState.member?.user.bot) || (newState.member?.user.bot)) return;
 
   const member = newState.member || oldState.member;
   if (!member) return;
 
-  const guildId = newState.guild.id;
   const userId = member.id;
-
   const userData = await User.findOne({ userId });
   const lang = userData?.language || 'en';
 
-  // Join announce
-  if (!oldState.channel && newState.channel) {
-    const text = userData?.joinPhrase || `${member.displayName} has joined the channel`;
+  const oldChannel = oldState.channel;
+  const newChannel = newState.channel;
 
-    // Join voice channel with the bot
-    const connection = joinVoiceChannel({
-      channelId: newState.channel.id,
-      guildId: guildId,
-      adapterCreator: newState.guild.voiceAdapterCreator,
-      selfDeaf: false,  // তুমি চাইলে true করো, বট নিজে শোনার দরকার নাই
-      selfMute: false,
-    });
+  if (!oldChannel && newChannel) {
+    // ইউজার ভিসি তে যোগ দিলো
 
-    // Prepare audio player
-    const player = createAudioPlayer();
-
-    // Get TTS URL from google-tts-api
-    let url;
-    try {
-      url = googleTTS.getAudioUrl(text, {
-        lang: lang,
-        slow: false,
-        host: 'https://translate.google.com',
+    // বট ইতোমধ্যে কানেক্টেড কি না চেক করো
+    let connection = getVoiceConnection(newState.guild.id);
+    if (!connection) {
+      // যদি না থাকে, তাহলে বটকে ভিসিতে কানেক্ট করাও
+      connection = joinVoiceChannel({
+        channelId: newChannel.id,
+        guildId: newState.guild.id,
+        adapterCreator: newState.guild.voiceAdapterCreator,
+        selfDeaf: false, // শুনতে পারবে
+        selfMute: false, // নিজে মিউট নয়
       });
-    } catch (err) {
-      console.error('TTS URL error:', err);
-      return;
+
+      try {
+        await entersState(connection, VoiceConnectionStatus.Ready, 20000);
+        console.log('Bot connected to voice channel');
+      } catch (error) {
+        console.error('Error connecting bot to voice channel:', error);
+        connection.destroy();
+        return;
+      }
     }
 
-    const resource = createAudioResource(url);
-
-    player.play(resource);
-    connection.subscribe(player);
-
-    player.on(AudioPlayerStatus.Idle, () => {
-      // Play finished, destroy connection & cleanup
-      connection.destroy();
-      activePlayers.delete(guildId);
-    });
-
-    player.on('error', error => {
-      console.error('Audio player error:', error);
-      connection.destroy();
-      activePlayers.delete(guildId);
-    });
-
-    activePlayers.set(guildId, player);
+    // ইউজার join announce করো
+    const text = userData?.joinPhrase || `${member.displayName} has joined the channel`;
+    await speak(text, newChannel, lang);
   }
 
-  // Leave announce
-  else if (oldState.channel && !newState.channel) {
-    const text = userData?.leavePhrase || `${member.displayName} has left the channel`;
+  if (oldChannel && !newChannel) {
+    // ইউজার ভিসি থেকে বেরিয়েছে
 
-    // Join old voice channel with bot
-    const connection = joinVoiceChannel({
-      channelId: oldState.channel.id,
-      guildId: guildId,
-      adapterCreator: oldState.guild.voiceAdapterCreator,
-      selfDeaf: false,
-      selfMute: false,
-    });
+    const connection = getVoiceConnection(oldState.guild.id);
+    if (connection) {
+      // leave announce করো
+      const text = userData?.leavePhrase || `${member.displayName} has left the channel`;
+      await speak(text, oldChannel, lang);
 
-    const player = createAudioPlayer();
-
-    let url;
-    try {
-      url = googleTTS.getAudioUrl(text, {
-        lang: lang,
-        slow: false,
-        host: 'https://translate.google.com',
-      });
-    } catch (err) {
-      console.error('TTS URL error:', err);
-      return;
+      // চ্যানেলে আর ইউজার বাকি নেই কি না চেক করো
+      const nonBotMembers = oldChannel.members.filter(m => !m.user.bot);
+      if (nonBotMembers.size === 0) {
+        // চ্যানেল খালি, কিন্তু বট ডিসকানেক্ট করবে না (এই লাইন কমেন্ট করে রেখেছি)
+        // connection.destroy();
+        // console.log('Bot disconnected because channel is empty');
+      }
     }
-
-    const resource = createAudioResource(url);
-
-    player.play(resource);
-    connection.subscribe(player);
-
-    player.on(AudioPlayerStatus.Idle, () => {
-      connection.destroy();
-      activePlayers.delete(guildId);
-    });
-
-    player.on('error', error => {
-      console.error('Audio player error:', error);
-      connection.destroy();
-      activePlayers.delete(guildId);
-    });
-
-    activePlayers.set(guildId, player);
   }
 };
