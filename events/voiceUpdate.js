@@ -24,4 +24,10 @@ module.exports = async (oldState, newState) => {
     const text = userData?.leavePhrase || `${member.displayName} has left the channel`;
     await speak(text, oldState.channel, lang);
   }
+  const connection = joinVoiceChannel({
+  channelId: voiceChannel.id,
+  guildId: voiceChannel.guild.id,
+  adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+});
+
 };
