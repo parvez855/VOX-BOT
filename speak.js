@@ -1,16 +1,16 @@
-const {
-  createAudioPlayer,
-  createAudioResource,
-  joinVoiceChannel,
-  StreamType,
-} = require('@discordjs/voice');
+const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus } = require('@discordjs/voice');
 const googleTTS = require('google-tts-api');
-const https = require('https');
-const { Readable } = require('stream');
+const sodium = require('libsodium-wrappers');  // এনক্রিপশন জন্য দরকার
 
 async function speak(text, voiceChannel, lang = 'en') {
   try {
-    console.log(`🔊 Speaking in ${voiceChannel.name}: "${text}" [${lang}]`);
+    await sodium.ready;  // Ensure libsodium is ready (important)
+
+    const connection = joinVoiceChannel({
+      channelId: voiceChannel.id,
+      guildId: voiceChannel.guild.id,
+      adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+    });
 
     const url = googleTTS.getAudioUrl(text, {
       lang,
@@ -18,53 +18,24 @@ async function speak(text, voiceChannel, lang = 'en') {
       host: 'https://translate.google.com',
     });
 
-    const stream = await downloadStream(url);
-
-    const resource = createAudioResource(stream, {
-      inputType: StreamType.Arbitrary,
-    });
-
     const player = createAudioPlayer();
+    const resource = createAudioResource(url);
+
     player.play(resource);
-
-    const connection = joinVoiceChannel({
-      channelId: voiceChannel.id,
-      guildId: voiceChannel.guild.id,
-      adapterCreator: voiceChannel.guild.voiceAdapterCreator,
-      selfDeaf: false,
-    });
-
     connection.subscribe(player);
 
     player.on('error', error => {
-      console.error('🔴 Player Error:', error);
+      console.error('Audio Player Error:', error);
+      connection.destroy();
     });
 
-    player.on('idle', () => {
-      console.log('⏹️ Playback done.');
+    player.on(AudioPlayerStatus.Idle, () => {
       connection.destroy();
     });
 
   } catch (error) {
-    console.error('TTS Error:', error);
+    console.error('TTS speak error:', error);
   }
-}
-
-function downloadStream(url) {
-  return new Promise((resolve, reject) => {
-    https.get(url, (res) => {
-      const data = [];
-      res.on('data', chunk => data.push(chunk));
-      res.on('end', () => {
-        const buffer = Buffer.concat(data);
-        const readable = new Readable();
-        readable._read = () => {};
-        readable.push(buffer);
-        readable.push(null);
-        resolve(readable);
-      });
-    }).on('error', reject);
-  });
 }
 
 module.exports = speak;
