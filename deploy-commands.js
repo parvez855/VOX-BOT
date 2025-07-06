@@ -1,23 +1,28 @@
-// deploy-commands.js
+require('dotenv').config();
 const { REST, Routes } = require('discord.js');
 const fs = require('fs');
-require('dotenv').config();
 
 const commands = [];
-for (const file of fs.readdirSync('./commands')) {
-  const cmd = require(`./commands/${file}`);
-  if (cmd.data) commands.push(cmd.data.toJSON());
+const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
+
+for (const file of commandFiles) {
+  const command = require(`./commands/${file}`);
+  commands.push(command.data);
 }
 
 const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
-const CLIENT_ID = process.env.CLIENT_ID;
 
 (async () => {
   try {
-    console.log('🚀 Deploying GLOBAL slash commands...');
-    await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands });
-    console.log('✅ Global commands deployed! ⚡ May take up to 60 min to show.');
-  } catch (err) {
-    console.error('❌ Failed to deploy commands:', err);
+    console.log('Started refreshing global application (/) commands.');
+
+    await rest.put(
+      Routes.applicationCommands(process.env.CLIENT_ID), // Global deploy
+      { body: commands },
+    );
+
+    console.log('Successfully reloaded global application (/) commands.');
+  } catch (error) {
+    console.error(error);
   }
 })();
