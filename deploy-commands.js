@@ -21,7 +21,7 @@ const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
   try {
     console.log('Deploying commands...');
     await rest.put(
-      Routes.applicationGuildCommands(process.env.CLIENT_ID, config.guild_id),
+      Routes.applicationCommands(CLIENT_ID),
       { body: commands }
     );
     console.log('Commands deployed.');
