@@ -1,7 +1,7 @@
 {
-  "name": "VOX bot",
+  "name": "vox-bot",
   "version": "1.0.0",
-  "description": "Discord vox Bot",
+  "description": "Discord TTS Bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
