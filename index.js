@@ -4,21 +4,12 @@ const mongoose = require('mongoose');
 const fs = require('fs');
 require('dotenv').config();
 
-// Minimal HTTP server so Render detects a port
 const PORT = process.env.PORT || 3000;
 const server = http.createServer((req, res) => {
   res.end('Bot is running');
 });
 server.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
-});
-
-// Handle unexpected errors globally
-process.on('unhandledRejection', error => {
-  console.error('Unhandled promise rejection:', error);
-});
-process.on('uncaughtException', error => {
-  console.error('Uncaught exception:', error);
 });
 
 console.log('TOKEN:', process.env.TOKEN ? 'Present' : 'Missing');
@@ -90,6 +81,9 @@ client.on('interactionCreate', async (interaction) => {
 // Voice state update event
 const voiceUpdate = require('./events/voiceUpdate');
 client.on('voiceStateUpdate', voiceUpdate);
+
+// Suppress mongoose strictQuery warning
+mongoose.set('strictQuery', false);
 
 mongoose
   .connect(process.env.MONGO_URI, {
