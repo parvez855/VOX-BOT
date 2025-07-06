@@ -1,36 +1,43 @@
-// speak.js
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, StreamType } = require('@discordjs/voice');
-const gTTS = require('gtts'); // টেক্সট থেকে স্পিচ স্ট্রিম তৈরি করে
-const { PassThrough } = require('stream');
+const play = require('play-dl');  // npm install play-dl
+const googleTTS = require('google-tts-api'); // npm install google-tts-api
 
 async function speak(text, voiceChannel, lang = 'en') {
-  // বট ভয়েস চ্যানেলে জয়েন করবে
   const connection = joinVoiceChannel({
     channelId: voiceChannel.id,
     guildId: voiceChannel.guild.id,
     adapterCreator: voiceChannel.guild.voiceAdapterCreator,
   });
 
-  // gTTS দিয়ে স্পিচ স্ট্রিম তৈরি
-  const tts = new gTTS(text, lang);
-  const stream = new PassThrough();
-  tts.stream().pipe(stream);
+  try {
+    // google-tts-api দিয়ে স্পিচ URL নেয়া
+    const url = googleTTS.getAudioUrl(text, {
+      lang,
+      slow: false,
+      host: 'https://translate.google.com',
+    });
 
-  const resource = createAudioResource(stream, {
-    inputType: StreamType.Arbitrary,
-  });
+    // play-dl দিয়ে ইউটিউব অথবা mp3 URL থেকে স্ট্রিম তৈরি
+    const stream = await play.stream(url);
 
-  const player = createAudioPlayer();
-  player.play(resource);
-  connection.subscribe(player);
+    const resource = createAudioResource(stream.stream, {
+      inputType: stream.type,
+    });
 
-  player.on('error', error => {
-    console.error('Audio player error:', error);
-  });
+    const player = createAudioPlayer();
+    player.play(resource);
+    connection.subscribe(player);
 
-  player.on('idle', () => {
+    player.on('error', console.error);
+
+    player.on('idle', () => {
+      connection.destroy();
+    });
+
+  } catch (error) {
+    console.error('TTS Error:', error);
     connection.destroy();
-  });
+  }
 }
 
 module.exports = speak;
