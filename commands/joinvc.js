@@ -3,28 +3,20 @@ const { joinVoiceChannel } = require('@discordjs/voice');
 module.exports = {
   data: {
     name: 'joinvc',
-    description: 'Bot joins your current voice channel',
+    description: 'Make the bot join your voice channel',
   },
-
   async execute(interaction) {
     const member = interaction.member;
-    const voiceChannel = member.voice.channel;
+    const channel = member.voice.channel;
+    if (!channel) return interaction.reply('❌ You must be in a voice channel.');
 
-    if (!voiceChannel) {
-      return interaction.reply('❌ তুমি প্রথমে কোনো ভয়েস চ্যানেলে থাকতে হবে!');
-    }
+    joinVoiceChannel({
+      channelId: channel.id,
+      guildId: channel.guild.id,
+      adapterCreator: channel.guild.voiceAdapterCreator,
+      selfDeaf: false,
+    });
 
-    try {
-      joinVoiceChannel({
-        channelId: voiceChannel.id,
-        guildId: voiceChannel.guild.id,
-        adapterCreator: voiceChannel.guild.voiceAdapterCreator,
-      });
-
-      await interaction.reply('✅ আমি তোমার ভয়েস চ্যানেলে যোগ দিলাম!');
-    } catch (error) {
-      console.error('ভয়েস চ্যানেল যোগ দিতে সমস্যা:', error);
-      await interaction.reply('❌ ভয়েস চ্যানেলে যোগ দিতে পারছি না।');
-    }
+    await interaction.reply('✅ Joined your voice channel.');
   },
 };
