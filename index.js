@@ -1,6 +1,16 @@
+const http = require('http');
 const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const mongoose = require('mongoose');
 const fs = require('fs');
+
+// Minimal HTTP server so Render detects a port
+const PORT = process.env.PORT || 3000;
+const server = http.createServer((req, res) => {
+  res.end('Bot is running');
+});
+server.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}`);
+});
 
 // Debug environment variables to verify Render is loading them correctly
 console.log('TOKEN:', process.env.TOKEN ? 'Present' : 'Missing');
