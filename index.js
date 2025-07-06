@@ -1,14 +1,14 @@
 const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const mongoose = require('mongoose');
 const fs = require('fs');
-require('dotenv').config();
+require('dotenv').config(); // Only once at the top
 
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildVoiceStates,
-    GatewayIntentBits.GuildMessages
-  ]
+    GatewayIntentBits.GuildMessages,
+  ],
 });
 
 client.commands = new Collection();
@@ -21,7 +21,7 @@ for (const file of commandFiles) {
 }
 
 // Handle interaction
-client.on('interactionCreate', async interaction => {
+client.on('interactionCreate', async (interaction) => {
   if (!interaction.isCommand()) return;
   const command = client.commands.get(interaction.commandName);
   if (command) await command.execute(interaction);
@@ -31,14 +31,15 @@ client.on('interactionCreate', async interaction => {
 const voiceUpdate = require('./events/voiceUpdate');
 client.on('voiceStateUpdate', voiceUpdate);
 
-// MongoDB connection + bot login
-require('dotenv').config();
-const mongoose = require('mongoose');
-
-// connect to MongoDB using env variable
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => console.log('✅ MongoDB connected successfully!'))
-.catch((err) => console.error('❌ MongoDB connection error:', err));
+// Connect to MongoDB
+mongoose
+  .connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => {
+    console.log('✅ MongoDB connected successfully!');
+    // Login the Discord bot only after successful DB connection
+    client.login(process.env.TOKEN);
+  })
+  .catch((err) => console.error('❌ MongoDB connection error:', err));
