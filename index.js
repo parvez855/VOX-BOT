@@ -13,7 +13,14 @@ server.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
 });
 
-// Debug environment variables
+// Handle unexpected errors globally
+process.on('unhandledRejection', error => {
+  console.error('Unhandled promise rejection:', error);
+});
+process.on('uncaughtException', error => {
+  console.error('Uncaught exception:', error);
+});
+
 console.log('TOKEN:', process.env.TOKEN ? 'Present' : 'Missing');
 console.log('MONGO_URI:', process.env.MONGO_URI);
 console.log('MONGO_URI starts with mongodb+srv://:', process.env.MONGO_URI?.startsWith('mongodb+srv://'));
@@ -28,14 +35,12 @@ const client = new Client({
 
 client.commands = new Collection();
 
-// Load slash commands
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
 for (const file of commandFiles) {
   const command = require(`./commands/${file}`);
   client.commands.set(command.data.name, command);
 }
 
-// Function to deploy all commands globally
 async function deployCommands() {
   const commands = [];
   for (const command of client.commands.values()) {
@@ -48,7 +53,7 @@ async function deployCommands() {
     console.log('Started refreshing global application (/) commands.');
 
     await rest.put(
-      Routes.applicationCommands(process.env.CLIENT_ID), // Global deploy
+      Routes.applicationCommands(process.env.CLIENT_ID),
       { body: commands },
     );
 
@@ -58,7 +63,6 @@ async function deployCommands() {
   }
 }
 
-// Event: Bot is ready
 client.once('ready', async () => {
   console.log(`Logged in as ${client.user.tag}`);
   await deployCommands();
@@ -83,11 +87,10 @@ client.on('interactionCreate', async (interaction) => {
   }
 });
 
-// Voice state update event (তুমি আগে যা দিয়েছো)
+// Voice state update event
 const voiceUpdate = require('./events/voiceUpdate');
 client.on('voiceStateUpdate', voiceUpdate);
 
-// Connect to MongoDB, then login Discord bot
 mongoose
   .connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
