@@ -1,38 +1,36 @@
-const { createAudioPlayer, createAudioResource, joinVoiceChannel, AudioPlayerStatus } = require('@discordjs/voice');
-const googleTTS = require('google-tts-api');
-const playdl = require('play-dl');
+// speak.js
+const { joinVoiceChannel, createAudioPlayer, createAudioResource, StreamType } = require('@discordjs/voice');
+const gTTS = require('gtts'); // টেক্সট থেকে স্পিচ স্ট্রিম তৈরি করে
+const { PassThrough } = require('stream');
 
-module.exports = async function speak(text, voiceChannel, lang = 'bn') {
-  try {
-    const url = googleTTS.getAudioUrl(text, {
-      lang,
-      slow: false,
-      host: 'https://translate.google.com',
-    });
+async function speak(text, voiceChannel, lang = 'en') {
+  // বট ভয়েস চ্যানেলে জয়েন করবে
+  const connection = joinVoiceChannel({
+    channelId: voiceChannel.id,
+    guildId: voiceChannel.guild.id,
+    adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+  });
 
-    const stream = await playdl.stream(url);
+  // gTTS দিয়ে স্পিচ স্ট্রিম তৈরি
+  const tts = new gTTS(text, lang);
+  const stream = new PassThrough();
+  tts.stream().pipe(stream);
 
-    const connection = joinVoiceChannel({
-      channelId: voiceChannel.id,
-      guildId: voiceChannel.guild.id,
-      adapterCreator: voiceChannel.guild.voiceAdapterCreator,
-    });
+  const resource = createAudioResource(stream, {
+    inputType: StreamType.Arbitrary,
+  });
 
-    const player = createAudioPlayer();
-    const resource = createAudioResource(stream.stream, {
-      inputType: stream.type,
-    });
+  const player = createAudioPlayer();
+  player.play(resource);
+  connection.subscribe(player);
 
-    player.play(resource);
-    connection.subscribe(player);
+  player.on('error', error => {
+    console.error('Audio player error:', error);
+  });
 
-    return new Promise((resolve) => {
-      player.on(AudioPlayerStatus.Idle, () => {
-        connection.destroy();
-        resolve();
-      });
-    });
-  } catch (err) {
-    console.error("TTS Error:", err);
-  }
-};
+  player.on('idle', () => {
+    connection.destroy();
+  });
+}
+
+module.exports = speak;
