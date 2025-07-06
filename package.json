@@ -1,12 +1,12 @@
 {
-  "name": "your-bot",
+  "name": "vox-bot",
   "version": "1.0.0",
   "main": "index.js",
-  "engines": {
-    "node": "20.x"
-  },
   "scripts": {
     "start": "node index.js"
+  },
+  "engines": {
+    "node": "20.x"
   },
   "dependencies": {
     "discord.js": "^14.0.3",
