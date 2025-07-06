@@ -7,11 +7,12 @@
     "start": "node index.js"
   },
   "dependencies": {
-    "discord.js": "^14.11.0",
-    "@discordjs/voice": "^0.14.0",
-    "node-gtts": "^1.2.3",
-    "mongoose": "^7.6.0",
-    "dotenv": "^16.3.1"
-  }
+  "discord.js": "^14.11.0",
+  "@discordjs/voice": "^0.14.0",
+  "mongoose": "^7.6.0",
+  "dotenv": "^16.3.1",
+  "google-tts-api": "^2.0.1"
+}
+
 }
 
