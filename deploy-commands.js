@@ -4,26 +4,20 @@ const fs = require('fs');
 require('dotenv').config();
 
 const commands = [];
-const commandFiles = fs.readdirSync('./commands');
-
-// Load all commands
-for (const file of commandFiles) {
-  const command = require(`./commands/${file}`);
-  commands.push(command.data.toJSON()); // Important
+for (const file of fs.readdirSync('./commands')) {
+  const cmd = require(`./commands/${file}`);
+  if (cmd.data) commands.push(cmd.data.toJSON());
 }
 
-const CLIENT_ID = process.env.CLIENT_ID;
 const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
+const CLIENT_ID = process.env.CLIENT_ID;
 
 (async () => {
   try {
     console.log('🚀 Deploying GLOBAL slash commands...');
-    await rest.put(Routes.applicationCommands(CLIENT_ID), {
-      body: commands,
-    });
-    console.log('✅ Global slash commands deployed successfully!');
-    console.log('🕒 It may take 5–60 minutes to appear in all servers.');
-  } catch (error) {
-    console.error('❌ Error deploying commands:', error);
+    await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands });
+    console.log('✅ Global commands deployed! ⚡ May take up to 60 min to show.');
+  } catch (err) {
+    console.error('❌ Failed to deploy commands:', err);
   }
 })();
