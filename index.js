@@ -1,7 +1,8 @@
 const http = require('http');
-const { Client, GatewayIntentBits, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, REST, Routes } = require('discord.js');
 const mongoose = require('mongoose');
 const fs = require('fs');
+require('dotenv').config();
 
 // Minimal HTTP server so Render detects a port
 const PORT = process.env.PORT || 3000;
@@ -12,7 +13,7 @@ server.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
 });
 
-// Debug environment variables to verify Render is loading them correctly
+// Debug environment variables
 console.log('TOKEN:', process.env.TOKEN ? 'Present' : 'Missing');
 console.log('MONGO_URI:', process.env.MONGO_URI);
 console.log('MONGO_URI starts with mongodb+srv://:', process.env.MONGO_URI?.startsWith('mongodb+srv://'));
@@ -28,34 +29,65 @@ const client = new Client({
 client.commands = new Collection();
 
 // Load slash commands
-const commandFiles = fs.readdirSync('./commands');
+const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
 for (const file of commandFiles) {
   const command = require(`./commands/${file}`);
   client.commands.set(command.data.name, command);
 }
 
-// Handle slash command interactions
+// Function to deploy all commands globally
+async function deployCommands() {
+  const commands = [];
+  for (const command of client.commands.values()) {
+    commands.push(command.data);
+  }
+
+  const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
+
+  try {
+    console.log('Started refreshing global application (/) commands.');
+
+    await rest.put(
+      Routes.applicationCommands(process.env.CLIENT_ID), // Global deploy
+      { body: commands },
+    );
+
+    console.log('Successfully reloaded global application (/) commands.');
+  } catch (error) {
+    console.error('Error deploying commands:', error);
+  }
+}
+
+// Event: Bot is ready
+client.once('ready', async () => {
+  console.log(`Logged in as ${client.user.tag}`);
+  await deployCommands();
+});
+
+// Interaction handling
 client.on('interactionCreate', async (interaction) => {
-  if (!interaction.isCommand()) return;
+  if (!interaction.isChatInputCommand()) return;
+
   const command = client.commands.get(interaction.commandName);
   if (!command) return;
+
   try {
     await command.execute(interaction);
   } catch (error) {
     console.error('Error executing command:', error);
     if (interaction.replied || interaction.deferred) {
-      await interaction.followUp({ content: 'There was an error executing this command.', ephemeral: true });
+      await interaction.followUp({ content: '❌ There was an error executing this command.', ephemeral: true });
     } else {
-      await interaction.reply({ content: 'There was an error executing this command.', ephemeral: true });
+      await interaction.reply({ content: '❌ There was an error executing this command.', ephemeral: true });
     }
   }
 });
 
-// Voice state update event
+// Voice state update event (তুমি আগে যা দিয়েছো)
 const voiceUpdate = require('./events/voiceUpdate');
 client.on('voiceStateUpdate', voiceUpdate);
 
-// Connect to MongoDB using environment variable set on Render
+// Connect to MongoDB, then login Discord bot
 mongoose
   .connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
@@ -63,7 +95,6 @@ mongoose
   })
   .then(() => {
     console.log('✅ MongoDB connected successfully!');
-    // Login Discord bot only after MongoDB connection is successful
     client.login(process.env.TOKEN);
   })
   .catch((err) => {
